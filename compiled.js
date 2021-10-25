@@ -1078,7 +1078,7 @@
     },
         t = new Map();
 
-    function htm(s) {
+    function htm$1(s) {
       var r = t.get(this);
       return r || (r = new Map(), t.set(this, r)), (r = n(this, r.get(s) || (r.set(s, r = function (n) {
         for (var t, s, r = 1, e = "", u = "", h = [0], p = function (n) {
@@ -1093,18 +1093,131 @@
       }(s)), r), arguments, [])).length > 1 ? r : r[0];
     }
 
-    const html = htm.bind(h);
+    const html = htm$1.bind(h);
+
+    const FIELD = '\ue000',
+          QUOTES = '\ue001';
+    function htm(statics) {
+      let h = this,
+          prev = 0,
+          current = [],
+          field = 0,
+          args,
+          name,
+          value,
+          quotes = [],
+          quote = 0,
+          last;
+      current.root = true;
+
+      const evaluate = (str, parts = [], raw) => {
+        let i = 0;
+        str = !raw && str === QUOTES ? quotes[quote++].slice(1, -1) : str.replace(/\ue001/g, m => quotes[quote++]);
+        if (!str) return str;
+        str.replace(/\ue000/g, (match, idx) => {
+          if (idx) parts.push(str.slice(i, idx));
+          i = idx + 1;
+          return parts.push(arguments[++field]);
+        });
+        if (i < str.length) parts.push(str.slice(i));
+        return parts.length > 1 ? parts : parts[0];
+      }; // close level
+
+
+      const up = () => {
+        [current, last, ...args] = current;
+        current.push(h(last, ...args));
+      };
+
+      statics.join(FIELD).replace(/<!--[^]*-->/g, '').replace(/<!\[CDATA\[[^]*\]\]>/g, '').replace(/('|")[^\1]*?\1/g, match => (quotes.push(match), QUOTES)) // .replace(/^\s*\n\s*|\s*\n\s*$/g,'')
+      .replace(/\s+/g, ' ') // ...>text<... sequence
+      .replace(/(?:^|>)([^<]*)(?:$|<)/g, (match, text, idx, str) => {
+        let close, tag;
+
+        if (idx) {
+          str.slice(prev, idx) // <abc/> → <abc />
+          .replace(/(\S)\/$/, '$1 /').split(' ').map((part, i) => {
+            if (part[0] === '/') {
+              close = tag || part.slice(1) || 1;
+            } else if (!i) {
+              tag = evaluate(part); // <p>abc<p>def, <tr><td>x<tr>
+
+              while (htm.close[current[1] + tag]) up();
+
+              current = [current, tag, null];
+              if (htm.empty[tag]) close = tag;
+            } else if (part) {
+              let props = current[2] || (current[2] = {});
+
+              if (part.slice(0, 3) === '...') {
+                Object.assign(props, arguments[++field]);
+              } else {
+                [name, value] = part.split('=');
+                props[evaluate(name)] = value ? evaluate(value) : true;
+              }
+            }
+          });
+        }
+
+        if (close) {
+          up(); // if last child is closable - close it too
+
+          while (last !== close && htm.close[last]) up();
+        }
+
+        prev = idx + match.length;
+        if (text && text !== ' ') evaluate((last = 0, text), current, true);
+      });
+      if (!current.root) up();
+      return current.length > 1 ? current : current[0];
+    } // self-closing elements
+
+    htm.empty = {}; // optional closing elements
+
+    htm.close = {};
+
+    'area base br col command embed hr img input keygen link meta param source track wbr ! !doctype ? ?xml'.split(' ').map(v => htm.empty[v] = htm.empty[v.toUpperCase()] = true); // https://html.spec.whatwg.org/multipage/syntax.html#optional-tags
+    // closed by the corresponding tag or end of parent content
+
+    let close = {
+      'li': '',
+      'dt': 'dd',
+      'dd': 'dt',
+      'p': 'address article aside blockquote details div dl fieldset figcaption figure footer form h1 h2 h3 h4 h5 h6 header hgroup hr main menu nav ol pre section table',
+      'rt': 'rp',
+      'rp': 'rt',
+      'optgroup': '',
+      'option': 'optgroup',
+      'caption': 'tbody thead tfoot tr colgroup',
+      'colgroup': 'thead tbody tfoot tr caption',
+      'thead': 'tbody tfoot caption',
+      'tbody': 'tfoot caption',
+      'tfoot': 'caption',
+      'tr': 'tbody tfoot',
+      'td': 'th tr',
+      'th': 'td tr tbody'
+    };
+
+    for (let tag in close) {
+      [...close[tag].split(' '), tag].map(closer => {
+        htm.close[tag] = htm.close[tag.toUpperCase()] = htm.close[tag + closer] = htm.close[tag.toUpperCase() + closer] = htm.close[tag + closer.toUpperCase()] = htm.close[tag.toUpperCase() + closer.toUpperCase()] = true;
+      });
+    }
+
+    const xhtml = htm.bind(h);
 
     function MyComponent() {
       return h("host", {
         shadowDom: true,
         children: [h("p", {
-          children: "this works"
-        }), html`<img src="https://placekitten.com/200"></image>`, h("p", {
-          children: "this works"
-        }), html`<img src="https://placekitten.com/200" />`, h("p", {
-          children: "this does not work"
-        }), html`<img src="https://placekitten.com/200">`]
+          children: `<img src="https://placekitten.com/64"></image> Atomico HTML`
+        }), html`<img src="https://placekitten.com/64"></image>`, h("p", {
+          children: `<img src="https://placekitten.com/64" /> Atomico HTML`
+        }), html`<img src="https://placekitten.com/64" />`, h("p", {
+          children: `<img src="https://placekitten.com/64"> Atomico HTML `
+        }), html`<img src="https://placekitten.com/64">`, h("p", {
+          children: `<img src="https://placekitten.com/64"> XHTM`
+        }), xhtml`<img src="https://placekitten.com/64">`]
       });
     }
 

@@ -1,14 +1,18 @@
-import { html, c } from "atomico";
+import { html, c, h } from "atomico";
+import xhtm from "xhtm";
+const xhtml = xhtm.bind(h);
 
 function MyComponent() {
   return (
     <host shadowDom>
-      <p>this works</p>
-      {html`<img src="https://placekitten.com/200"></image>`}
-      <p>this works</p>
-      {html`<img src="https://placekitten.com/200" />`}
-      <p>this does not work</p>
-      {html`<img src="https://placekitten.com/200">`}
+      <p>{`<img src="https://placekitten.com/64"></image> Atomico HTML`}</p>
+      {html`<img src="https://placekitten.com/64"></image>`}
+      <p>{`<img src="https://placekitten.com/64" /> Atomico HTML`}</p>
+      {html`<img src="https://placekitten.com/64" />`}
+      <p>{`<img src="https://placekitten.com/64"> Atomico HTML `}</p>
+      {html`<img src="https://placekitten.com/64">`}
+      <p>{`<img src="https://placekitten.com/64"> XHTM`}</p>
+      {xhtml`<img src="https://placekitten.com/64">`}
     </host>
   );
 }

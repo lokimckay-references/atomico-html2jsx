@@ -13,7 +13,7 @@ export default {
       browser: true,
       dedupe: ["atomico"],
     }),
-    commonjs(),
     babel(),
+    commonjs(),
   ],
 };
